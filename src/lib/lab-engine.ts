@@ -235,7 +235,9 @@ function shuffleStable<T>(arr: T[]): T[] {
   for (let i = out.length - 1; i > 0; i--) {
     seed = (seed * 1103515245 + 12345) % 2147483648;
     const j = seed % (i + 1);
-    [out[i], out[j]] = [out[j], out[i]];
+    const tmp = out[i] as T;
+    out[i] = out[j] as T;
+    out[j] = tmp;
   }
   return out;
 }
