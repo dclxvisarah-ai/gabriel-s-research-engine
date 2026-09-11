@@ -1,35 +1,43 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
-  COORDINATES,
+  AUTHORITY_STATUS,
+  TERRITORIES,
+  crossMapPairs,
+  type TerritoryId,
+} from "@/lib/v2-authority";
+import {
   DEPENDENCIES,
   EVIDENCE_KIND_WEIGHT,
   LAB_THRESHOLDS,
   SEED_EVIDENCE,
-  dedupe,
+  SEED_LINKS,
+  SEED_RUN_ID,
   evaluate,
   nextProbes,
-  normalizeSemanticKey,
+  normalizeStatement,
   orderInvariant,
-  type CoordinateId,
+  vennCells,
   type EvidenceKind,
-  type EvidenceUnit,
-} from "@/lib/lab-engine";
+  type EvidenceStatement,
+  type LinkBasis,
+  type TerritoryLink,
+} from "@/lib/v2-engine";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Structural Research Lab — Evidence & Resolution Engine" },
+      { title: "Gabriel V2 Research Engine — Evidence, Territories, CrossMap" },
       {
         name: "description",
         content:
-          "Research-only lab for evidence taxonomy, semantic normalization, resolution and dependency mathematics, collision tests, order-invariance, and adaptive stopping.",
+          "Research-only engine for the locked V2 nine-territory architecture: evidence-first capture, multi-territory overlap, CrossMap relationships, and earned intersections.",
       },
-      { property: "og:title", content: "Structural Research Lab" },
+      { property: "og:title", content: "Gabriel V2 Research Engine" },
       {
         property: "og:description",
         content:
-          "Evidence taxonomy, dependency mathematics, and the smallest useful structural engine. Research language only.",
+          "Evidence-first structural research: expanded 1–9 vocabulary, CrossMap statuses, earned intersections, provenance and run isolation.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -44,19 +52,20 @@ const KINDS: EvidenceKind[] = [
   "structural_inference",
   "corroboration",
   "contradiction",
+  "uncertainty",
 ];
 
 const AXIOMS = [
-  "Self-report is hypothesis, never resolution.",
-  "Responses generate evidence; evidence is what is scored.",
-  "Evidence ≠ qualification ≠ confidence. Three separate quantities.",
-  "Semantic redundancy within one response is one evidence unit.",
-  "Independent corroboration across responses stays distinct.",
-  "Contradictions are information: they damp confidence, not resolution.",
-  "One response may support multiple structural questions.",
-  "Coordinates are structurally earned, not assigned.",
-  "Undetermined is a valid terminal state.",
-  "Adaptive probing stops when sufficient evidence is earned.",
+  "Evidence first: response → evidence → structural location(s) → relationships → possible Number.",
+  "Wording never jumps straight to a Number. A response is never automatically a Number.",
+  "Expanded 1–9 vocabulary and distinctions are locked V2 reference data.",
+  "One evidence item may be located in several territories. Overlap is information.",
+  "Repeated wording inside one response is one evidence unit; across responses it is corroboration.",
+  "CrossMap status is authority: DIRECT, CANDIDATE, LINGUISTIC_PROXIMITY, NO_CURRENT_OVERLAP.",
+  "Linguistic proximity is never proof of intersection.",
+  "An intersection is earned only when evidence supports both meanings.",
+  "Contradiction, Unknown and Undetermined are all valid outcomes. 'I don't know' is never Number 1.",
+  "Every result traces to evidence ids. A result may never feed back as evidence.",
 ];
 
 function statusColor(status: string) {
@@ -65,71 +74,114 @@ function statusColor(status: string) {
   return "text-undetermined";
 }
 
+function relColor(status: string) {
+  if (status === "EARNED_INTERSECTION") return "text-earned";
+  if (status === "CANDIDATE_RELATIONSHIP") return "text-provisional";
+  if (status === "UNMAPPED_EVIDENCE_INTERSECTION") return "text-hypothesis";
+  if (status === "CONTRADICTED") return "text-destructive";
+  return "text-undetermined";
+}
+
 function Lab() {
-  const [units, setUnits] = useState<EvidenceUnit[]>(SEED_EVIDENCE);
+  const [evidence, setEvidence] = useState<EvidenceStatement[]>(SEED_EVIDENCE);
+  const [links, setLinks] = useState<TerritoryLink[]>(SEED_LINKS);
+
   const [responseId, setResponseId] = useState("R6");
-  const [coordinate, setCoordinate] = useState<CoordinateId>(1);
+  const [statement, setStatement] = useState("");
   const [kind, setKind] = useState<EvidenceKind>("behavioral");
-  const [semanticKey, setSemanticKey] = useState("");
   const [strength, setStrength] = useState(0.9);
 
-  const { kept, collapsed } = useMemo(() => dedupe(units), [units]);
-  const results = useMemo(() => evaluate(units), [units]);
-  const probes = useMemo(() => nextProbes(results), [results]);
-  const invariant = useMemo(() => orderInvariant(units), [units]);
+  const [linkEvidenceId, setLinkEvidenceId] = useState("s02");
+  const [linkTerritory, setLinkTerritory] = useState<TerritoryId>(1);
+  const [linkBasis, setLinkBasis] = useState<LinkBasis>("evidence");
 
-  const addUnit = () => {
-    if (!semanticKey.trim()) return;
-    setUnits((u) => [
-      ...u,
+  const input = useMemo(
+    () => ({ evidence, links, runId: SEED_RUN_ID }),
+    [evidence, links],
+  );
+  const evaluation = useMemo(() => evaluate(input), [input]);
+  const { results, redundancy, relationships, provenanceViolations } = evaluation;
+  const probes = useMemo(() => nextProbes(results), [results]);
+  const invariant = useMemo(() => orderInvariant(input), [input]);
+  const cells = useMemo(
+    () => vennCells(redundancy.kept, links),
+    [redundancy.kept, links],
+  );
+  const activeRelationships = relationships.filter(
+    (r) => r.status !== "NO_CURRENT_OVERLAP",
+  );
+
+  const addEvidence = () => {
+    if (!statement.trim()) return;
+    setEvidence((all) => [
+      ...all,
       {
-        id: `e${String(u.length + 1).padStart(2, "0")}-${Math.random().toString(36).slice(2, 6)}`,
+        id: `s${String(all.length + 1).padStart(2, "0")}-${Math.random().toString(36).slice(2, 5)}`,
+        runId: SEED_RUN_ID,
         responseId: responseId.trim() || "R?",
-        coordinate,
+        statement: statement.trim(),
         kind,
-        semanticKey: semanticKey.trim(),
         strength,
+        origin: "response",
       },
     ]);
-    setSemanticKey("");
+    setStatement("");
+  };
+
+  const addLink = () => {
+    if (!evidence.some((e) => e.id === linkEvidenceId)) return;
+    setLinks((all) => [
+      ...all,
+      {
+        id: `l${String(all.length + 1).padStart(2, "0")}-${Math.random().toString(36).slice(2, 5)}`,
+        evidenceId: linkEvidenceId,
+        territory: linkTerritory,
+        basis: linkBasis,
+        rationale: "analyst placement",
+      },
+    ]);
   };
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-12">
       <header className="lab-panel p-6">
-        <p className="lab-label">Research-only lab · no production formula</p>
+        <p className="lab-label">
+          Research project only · no production formula, scoring or branch logic
+        </p>
         <h1 className="mt-3 font-mono text-2xl font-semibold tracking-tight sm:text-3xl">
-          Structural Evidence &amp; Resolution Lab
+          Gabriel V2 Research Engine
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-          A sandbox for evidence taxonomy, semantic normalization, resolution /
-          dependency / confidence mathematics, collision tests, order-invariance,
-          missing-evidence handling, adaptive stopping, and the smallest useful
-          structural engine. Research vocabulary only — nothing here is
-          user-facing copy, and no branch logic is imported.
+          Evidence-first structural research over the locked V2 nine-territory
+          architecture: evidence statements, multi-territory location, CrossMap
+          relationships, earned intersections, provenance and run isolation.
+          Research vocabulary only — not user-facing copy.
         </p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded border border-border bg-secondary/40 p-4">
-            <p className="lab-label">Production baseline (untouched reference)</p>
-            <pre className="mt-2 overflow-x-auto font-mono text-xs text-foreground">
-{`W_n = Raw_n / sqrt(max(Available_n, 1)) * 2
-thresholds  2.4 / 0.35 / 1.8
-insufficient convergence -> Undetermined`}
-            </pre>
-          </div>
-          <div className="rounded border border-border bg-secondary/40 p-4">
-            <p className="lab-label">Lab thresholds (deliberately distinct)</p>
-            <pre className="mt-2 overflow-x-auto font-mono text-xs text-foreground">
+        <dl className="mt-5 grid gap-2 sm:grid-cols-2">
+          {Object.entries(AUTHORITY_STATUS).map(([k, v]) => (
+            <div
+              key={k}
+              className="rounded border border-border bg-secondary/40 p-3 font-mono text-xs"
+            >
+              <dt className="text-primary">{k}</dt>
+              <dd className="mt-1 text-muted-foreground">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="mt-3 rounded border border-border bg-secondary/40 p-4">
+          <p className="lab-label">
+            Research thresholds (unvalidated — not promoted to authority)
+          </p>
+          <pre className="mt-2 overflow-x-auto font-mono text-xs text-foreground">
 {`resolution   >= ${LAB_THRESHOLDS.resolution}
 independence >= ${LAB_THRESHOLDS.independence} distinct responses
 confidence   >= ${LAB_THRESHOLDS.confidence}
-qualification == 1 (all dependencies resolved)`}
-            </pre>
-          </div>
+qualification == 1 (research dependency graph, UNVERIFIED)`}
+          </pre>
         </div>
       </header>
 
-      <Section title="Structural axioms" note="Preserved research invariants">
+      <Section title="V2 pipeline axioms" note="Locked architecture, research mechanisms">
         <ol className="grid gap-2 sm:grid-cols-2">
           {AXIOMS.map((a, i) => (
             <li key={a} className="flex gap-3 text-sm text-muted-foreground">
@@ -143,9 +195,27 @@ qualification == 1 (all dependencies resolved)`}
       </Section>
 
       <Section
-        title="Evidence taxonomy"
-        note="Kind determines admissibility and weight"
+        title="Expanded 1–9 territories"
+        note="Locked V2 vocabulary and distinctions"
       >
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {TERRITORIES.map((t) => (
+            <div key={t.n} className="rounded border border-border p-4">
+              <p className="font-mono text-sm">
+                <span className="text-primary">{t.n}</span> {t.name}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {t.vocabulary.join(" · ")}
+              </p>
+              <p className="mt-2 border-t border-border/50 pt-2 font-mono text-[11px] text-hypothesis">
+                distinction: {t.distinction}
+              </p>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Evidence taxonomy" note="Kind determines admissibility and weight">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {KINDS.map((k) => (
             <div key={k} className="rounded border border-border p-3">
@@ -156,7 +226,9 @@ qualification == 1 (all dependencies resolved)`}
                   ? "hypothesis; raises salience only"
                   : k === "contradiction"
                     ? "tracked separately; damps confidence"
-                    : "contributes resolution mass"}
+                    : k === "uncertainty"
+                      ? "Unknown; never becomes Number 1"
+                      : "contributes resolution mass"}
               </p>
             </div>
           ))}
@@ -164,14 +236,14 @@ qualification == 1 (all dependencies resolved)`}
       </Section>
 
       <Section
-        title="Evidence corpus"
-        note={`${units.length} raw · ${kept.length} normalized · ${collapsed.length} collapsed as redundant`}
+        title="Step 1 — evidence statements"
+        note={`${evidence.length} captured · ${redundancy.kept.length} distinct · ${redundancy.redundant.length} redundant wording · ${redundancy.corroborating.length} corroborated`}
       >
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse font-mono text-xs">
+          <table className="w-full min-w-[760px] border-collapse font-mono text-xs">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
-                {["id", "response", "coord", "kind", "normalized key", "s", ""].map(
+                {["id", "response", "kind", "normalized statement", "s", "origin", ""].map(
                   (h) => (
                     <th key={h} className="px-2 py-2 font-normal uppercase tracking-widest">
                       {h}
@@ -181,28 +253,31 @@ qualification == 1 (all dependencies resolved)`}
               </tr>
             </thead>
             <tbody>
-              {units.map((u) => {
-                const isKept = kept.some((k) => k.id === u.id);
+              {evidence.map((e) => {
+                const kept = redundancy.kept.some((k) => k.id === e.id);
                 return (
                   <tr
-                    key={u.id}
-                    className={`border-b border-border/60 ${isKept ? "" : "text-undetermined line-through"}`}
+                    key={e.id}
+                    className={`border-b border-border/60 ${kept ? "" : "text-undetermined line-through"}`}
                   >
-                    <td className="px-2 py-2">{u.id}</td>
-                    <td className="px-2 py-2 text-primary">{u.responseId}</td>
-                    <td className="px-2 py-2">{u.coordinate}</td>
+                    <td className="px-2 py-2">{e.id}</td>
+                    <td className="px-2 py-2 text-primary">{e.responseId}</td>
                     <td
-                      className={`px-2 py-2 ${u.kind === "self_report" ? "text-hypothesis" : u.kind === "contradiction" ? "text-destructive" : ""}`}
+                      className={`px-2 py-2 ${e.kind === "self_report" || e.kind === "uncertainty" ? "text-hypothesis" : e.kind === "contradiction" ? "text-destructive" : ""}`}
                     >
-                      {u.kind}
+                      {e.kind}
                     </td>
                     <td className="px-2 py-2 text-muted-foreground">
-                      {normalizeSemanticKey(u.semanticKey)}
+                      {normalizeStatement(e.statement)}
                     </td>
-                    <td className="px-2 py-2">{u.strength.toFixed(2)}</td>
+                    <td className="px-2 py-2">{e.strength.toFixed(2)}</td>
+                    <td className="px-2 py-2 text-muted-foreground">{e.origin}</td>
                     <td className="px-2 py-2 text-right">
                       <button
-                        onClick={() => setUnits((all) => all.filter((x) => x.id !== u.id))}
+                        onClick={() => {
+                          setEvidence((all) => all.filter((x) => x.id !== e.id));
+                          setLinks((all) => all.filter((l) => l.evidenceId !== e.id));
+                        }}
                         className="text-muted-foreground transition-colors hover:text-destructive"
                       >
                         drop
@@ -215,22 +290,8 @@ qualification == 1 (all dependencies resolved)`}
           </table>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <LabInput label="response id" value={responseId} onChange={setResponseId} />
-          <div>
-            <p className="lab-label">coordinate</p>
-            <select
-              value={coordinate}
-              onChange={(e) => setCoordinate(Number(e.target.value) as CoordinateId)}
-              className="mt-1 w-full rounded border border-input bg-secondary px-2 py-2 font-mono text-xs text-foreground"
-            >
-              {COORDINATES.map((c) => (
-                <option key={c.n} value={c.n}>
-                  {c.n} · {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
           <div>
             <p className="lab-label">kind</p>
             <select
@@ -247,9 +308,9 @@ qualification == 1 (all dependencies resolved)`}
           </div>
           <div className="lg:col-span-2">
             <LabInput
-              label="semantic claim"
-              value={semanticKey}
-              onChange={setSemanticKey}
+              label="evidence statement (no territory yet)"
+              value={statement}
+              onChange={setStatement}
             />
           </div>
           <div>
@@ -267,33 +328,195 @@ qualification == 1 (all dependencies resolved)`}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
-            onClick={addUnit}
+            onClick={addEvidence}
             className="rounded bg-primary px-4 py-2 font-mono text-xs text-primary-foreground transition-opacity hover:opacity-90"
           >
-            add evidence unit
+            capture evidence
           </button>
           <button
-            onClick={() => setUnits(SEED_EVIDENCE)}
+            onClick={() => {
+              setEvidence(SEED_EVIDENCE);
+              setLinks(SEED_LINKS);
+            }}
             className="rounded border border-border px-4 py-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             reset corpus
           </button>
           <button
-            onClick={() => setUnits([])}
+            onClick={() => {
+              setEvidence([]);
+              setLinks([]);
+            }}
             className="rounded border border-border px-4 py-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
-            clear (missing-evidence case)
+            clear (unknown / missing-evidence case)
           </button>
         </div>
       </Section>
 
-      <Section title="Coordinate resolution" note="Provisional 1–9 · non-sequential dependency model">
+      <Section
+        title="Step 2 — structural location"
+        note={`${links.length} links · one evidence item may sit in several territories`}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[620px] border-collapse font-mono text-xs">
+            <thead>
+              <tr className="border-b border-border text-left text-muted-foreground">
+                {["link", "evidence", "territory", "basis", "rationale", ""].map((h) => (
+                  <th key={h} className="px-2 py-2 font-normal uppercase tracking-widest">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {links.map((l) => (
+                <tr key={l.id} className="border-b border-border/60">
+                  <td className="px-2 py-2">{l.id}</td>
+                  <td className="px-2 py-2 text-primary">{l.evidenceId}</td>
+                  <td className="px-2 py-2">
+                    {l.territory} · {TERRITORIES[l.territory - 1]!.name}
+                  </td>
+                  <td
+                    className={`px-2 py-2 ${l.basis === "vocabulary_similarity" ? "text-hypothesis" : ""}`}
+                  >
+                    {l.basis}
+                  </td>
+                  <td className="px-2 py-2 text-muted-foreground">{l.rationale}</td>
+                  <td className="px-2 py-2 text-right">
+                    <button
+                      onClick={() => setLinks((all) => all.filter((x) => x.id !== l.id))}
+                      className="text-muted-foreground transition-colors hover:text-destructive"
+                    >
+                      drop
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="lab-label">evidence</p>
+            <select
+              value={linkEvidenceId}
+              onChange={(e) => setLinkEvidenceId(e.target.value)}
+              className="mt-1 w-full rounded border border-input bg-secondary px-2 py-2 font-mono text-xs text-foreground"
+            >
+              {evidence.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.id} · {e.statement.slice(0, 28)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <p className="lab-label">territory</p>
+            <select
+              value={linkTerritory}
+              onChange={(e) => setLinkTerritory(Number(e.target.value) as TerritoryId)}
+              className="mt-1 w-full rounded border border-input bg-secondary px-2 py-2 font-mono text-xs text-foreground"
+            >
+              {TERRITORIES.map((t) => (
+                <option key={t.n} value={t.n}>
+                  {t.n} · {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <p className="lab-label">basis</p>
+            <select
+              value={linkBasis}
+              onChange={(e) => setLinkBasis(e.target.value as LinkBasis)}
+              className="mt-1 w-full rounded border border-input bg-secondary px-2 py-2 font-mono text-xs text-foreground"
+            >
+              <option value="evidence">evidence</option>
+              <option value="vocabulary_similarity">vocabulary_similarity</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={addLink}
+              className="rounded bg-primary px-4 py-2 font-mono text-xs text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              locate evidence
+            </button>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="Step 3 — relationships &amp; intersections"
+        note="CrossMap is authority; status is earned from evidence"
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[680px] border-collapse font-mono text-xs">
+            <thead>
+              <tr className="border-b border-border text-left text-muted-foreground">
+                {["pair", "crossmap", "derived status", "shared evidence", "vocab only"].map(
+                  (h) => (
+                    <th key={h} className="px-2 py-2 font-normal uppercase tracking-widest">
+                      {h}
+                    </th>
+                  ),
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {activeRelationships.map((r) => (
+                <tr key={`${r.a}-${r.b}`} className="border-b border-border/60">
+                  <td className="px-2 py-2 text-primary">
+                    {r.a}↔{r.b}
+                  </td>
+                  <td className="px-2 py-2">{r.crossMap}</td>
+                  <td className={`px-2 py-2 ${relColor(r.status)}`}>{r.status}</td>
+                  <td className="px-2 py-2 text-muted-foreground">
+                    {r.sharedEvidenceIds.join(", ") || "—"}
+                  </td>
+                  <td className="px-2 py-2 text-hypothesis">
+                    {r.vocabularyOnlyEvidenceIds.join(", ") || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 font-mono text-xs text-muted-foreground">
+          {relationships.filter((r) => r.status === "NO_CURRENT_OVERLAP").length} pairs
+          remain NO_CURRENT_OVERLAP — no relationship is invented.
+        </p>
+      </Section>
+
+      <Section
+        title="Venn / bubble / compass cells"
+        note="Derived from evidence links — never a scoring authority"
+      >
+        <ul className="grid gap-2 font-mono text-xs sm:grid-cols-2 lg:grid-cols-3">
+          {cells.length === 0 && <li className="text-undetermined">no located evidence</li>}
+          {cells.map((c) => (
+            <li key={c.territories.join("-")} className="rounded border border-border p-3">
+              <span className="text-primary">{c.territories.join(" ∩ ")}</span>
+              <span className="ml-2 text-muted-foreground">
+                {c.evidenceIds.join(", ")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      <Section
+        title="Step 4 — possible Number"
+        note="Locked 1–9 · research mathematics · always traceable"
+      >
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {results.map((r) => (
-            <div key={r.coordinate} className="rounded border border-border p-4">
+            <div key={r.territory} className="rounded border border-border p-4">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="font-mono text-sm">
-                  <span className="text-primary">{r.coordinate}</span> {r.name}
+                  <span className="text-primary">{r.territory}</span> {r.name}
                 </p>
                 <span className={`font-mono text-xs ${statusColor(r.status)}`}>
                   {r.status}
@@ -305,13 +528,17 @@ qualification == 1 (all dependencies resolved)`}
                 <Metric k="qualification" v={r.qualification.toFixed(2)} />
                 <Metric k="confidence" v={r.confidence.toFixed(2)} />
                 <Metric k="contradictions" v={String(r.contradictions)} />
-                <Metric
-                  k="depends on"
-                  v={DEPENDENCIES[r.coordinate].join(",") || "—"}
-                />
+                <Metric k="depends on" v={DEPENDENCIES[r.territory].join(",") || "—"} />
               </dl>
+              <p className="mt-3 font-mono text-[11px] text-muted-foreground">
+                from: {r.supportingEvidenceIds.join(", ") || "—"}
+                {r.contradictingEvidenceIds.length > 0 &&
+                  ` · contra: ${r.contradictingEvidenceIds.join(", ")}`}
+                {r.uncertaintyEvidenceIds.length > 0 &&
+                  ` · unknown: ${r.uncertaintyEvidenceIds.join(", ")}`}
+              </p>
               {r.hypothesisOnly && (
-                <p className="mt-3 font-mono text-xs text-hypothesis">
+                <p className="mt-2 font-mono text-xs text-hypothesis">
                   hypothesis only — no response-derived evidence
                 </p>
               )}
@@ -321,16 +548,18 @@ qualification == 1 (all dependencies resolved)`}
       </Section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Section title="Adaptive probing queue" note="Stops when status can no longer change">
+        <Section title="Adaptive probing queue" note="Stopping rule remains UNVERIFIED">
           {probes.length === 0 ? (
             <p className="font-mono text-xs text-earned">
-              all coordinates earned — probing halted
+              every territory earned — probing halted
             </p>
           ) : (
             <ul className="space-y-2 font-mono text-xs">
               {probes.map((p) => (
-                <li key={p.coordinate} className="flex gap-3">
-                  <span className="text-primary">{String(p.coordinate).padStart(2, "0")}</span>
+                <li key={p.territory} className="flex gap-3">
+                  <span className="text-primary">
+                    {String(p.territory).padStart(2, "0")}
+                  </span>
                   <span>{p.name}</span>
                   <span className="text-muted-foreground">— {p.reason}</span>
                 </li>
@@ -339,40 +568,40 @@ qualification == 1 (all dependencies resolved)`}
           )}
         </Section>
 
-        <Section title="Invariance &amp; collision tests" note="Run against the live corpus">
+        <Section title="Live invariants" note="Mirrors the automated V2 test suite">
           <ul className="space-y-2 font-mono text-xs">
+            <Check ok={TERRITORIES.length === 9} label="exactly nine territories, no new Numbers" />
             <Check ok={invariant} label="order-invariance (forward / reverse / shuffled)" />
             <Check
-              ok={collapsed.every((c) =>
-                units.some(
-                  (u) =>
-                    u.id !== c.id &&
-                    u.responseId === c.responseId &&
-                    u.coordinate === c.coordinate &&
-                    normalizeSemanticKey(u.semanticKey) ===
-                      normalizeSemanticKey(c.semanticKey),
-                ),
+              ok={crossMapPairs().length === 36}
+              label="all 36 territory pairs classified by locked CrossMap"
+            />
+            <Check
+              ok={relationships.every(
+                (r) =>
+                  r.status !== "EARNED_INTERSECTION" || r.sharedEvidenceIds.length > 0,
               )}
-              label="redundancy collapse only within a single response"
+              label="intersections earned only from shared evidence"
+            />
+            <Check
+              ok={relationships.every(
+                (r) => r.crossMap !== "LINGUISTIC_PROXIMITY" || r.sharedEvidenceIds.length === 0 || r.status === "EARNED_INTERSECTION",
+              )}
+              label="linguistic proximity never auto-promotes to intersection"
+            />
+            <Check
+              ok={results.every(
+                (r) => r.resolution === 0 || r.supportingEvidenceIds.length > 0,
+              )}
+              label="every result traces back to evidence ids"
+            />
+            <Check
+              ok={provenanceViolations.length === 0}
+              label="no result-derived or foreign-run evidence admitted"
             />
             <Check
               ok={results.every((r) => r.confidence <= 1 && r.qualification <= 1)}
               label="confidence and qualification bounded to [0,1]"
-            />
-            <Check
-              ok={results.every((r) => r.resolution === 0 || r.status !== "Undetermined" || r.qualification < 1 || r.independence < LAB_THRESHOLDS.independence || r.confidence < LAB_THRESHOLDS.confidence || r.resolution < LAB_THRESHOLDS.resolution)}
-              label="Undetermined is always attributable to a named deficit"
-            />
-            <Check
-              ok={results.every(
-                (r) =>
-                  r.contradictions === 0 ||
-                  r.resolution ===
-                    evaluate(units.filter((u) => u.kind !== "contradiction")).find(
-                      (x) => x.coordinate === r.coordinate,
-                    )?.resolution,
-              )}
-              label="contradictions never alter resolution mass"
             />
           </ul>
         </Section>
@@ -380,9 +609,9 @@ qualification == 1 (all dependencies resolved)`}
 
       <footer className="mt-10 border-t border-border pt-5">
         <p className="font-mono text-xs text-muted-foreground">
-          Lab scope only. Branch-specific production work (including Gambling /
-          The Chase) stays outside this engine; no production formula is defined
-          here.
+          Research project only. Production scoring, math and branch-specific work
+          (including Gambling / The Chase) stay outside this engine and are neither
+          imported nor modified here. V3 remains research-only.
         </p>
       </footer>
     </main>
