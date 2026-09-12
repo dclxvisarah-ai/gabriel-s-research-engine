@@ -235,6 +235,11 @@ export interface TerritoryResult {
   contradictingEvidenceIds: string[];
   uncertaintyEvidenceIds: string[];
   hypothesisEvidenceIds: string[];
+  /**
+   * Evidence linked here on a vocabulary-similarity basis only. Reported as
+   * research/reference information; excluded from resolution and Earned status.
+   */
+  vocabularyOnlyEvidenceIds: string[];
   excludedRedundantIds: string[];
 }
 
@@ -248,6 +253,8 @@ export interface Evaluation {
   results: TerritoryResult[];
   redundancy: RedundancyReport;
   relationships: RelationshipRecord[];
+  /** Venn / bubble / compass source cells — derived, never scoring authority. */
+  vennCells: VennCell[];
   provenanceViolations: ProvenanceViolation[];
 }
 
@@ -263,9 +270,20 @@ export function evaluate(input: EvaluationInput): Evaluation {
   const byId = new Map(redundancy.kept.map((e) => [e.id, e]));
   const links = input.links.filter((l) => keptIds.has(l.evidenceId));
 
+  // CORRECTION (V2): vocabulary similarity is research/reference information
+  // only. It may never contribute to evidence-supported structural location,
+  // resolution, or Earned status. It is kept and reported, never counted.
+  const evidenceBasisLinks = links.filter((l) => l.basis === "evidence");
+  const vocabularyLinks = links.filter((l) => l.basis !== "evidence");
+
   const perTerritory = new Map<TerritoryId, TerritoryLink[]>();
-  for (const n of TERRITORY_IDS) perTerritory.set(n, []);
-  for (const l of links) perTerritory.get(l.territory)?.push(l);
+  const perTerritoryVocab = new Map<TerritoryId, TerritoryLink[]>();
+  for (const n of TERRITORY_IDS) {
+    perTerritory.set(n, []);
+    perTerritoryVocab.set(n, []);
+  }
+  for (const l of evidenceBasisLinks) perTerritory.get(l.territory)?.push(l);
+  for (const l of vocabularyLinks) perTerritoryVocab.get(l.territory)?.push(l);
 
   const raw = new Map<
     TerritoryId,
@@ -278,6 +296,13 @@ export function evaluate(input: EvaluationInput): Evaluation {
     // it counts once, no matter how many links point at it.
     const evIds = [...new Set(own.map((l) => l.evidenceId))].sort();
     const units = evIds.map((id) => byId.get(id)!).filter(Boolean);
+    const vocabularyOnlyEvidenceIds = [
+      ...new Set(
+        (perTerritoryVocab.get(t.n) ?? [])
+          .map((l) => l.evidenceId)
+          .filter((id) => byId.has(id) && !evIds.includes(id)),
+      ),
+    ].sort();
 
     const supporting = units.filter(
       (u) =>
@@ -288,6 +313,7 @@ export function evaluate(input: EvaluationInput): Evaluation {
     const contradicting = units.filter((u) => u.kind === "contradiction");
     const uncertainty = units.filter((u) => u.kind === "uncertainty");
     const hypothesis = units.filter((u) => u.kind === "self_report");
+
 
     const resolution = supporting.reduce(
       (s, u) => s + EVIDENCE_KIND_WEIGHT[u.kind] * u.strength,
@@ -316,6 +342,7 @@ export function evaluate(input: EvaluationInput): Evaluation {
       contradictingEvidenceIds: contradicting.map((u) => u.id),
       uncertaintyEvidenceIds: uncertainty.map((u) => u.id),
       hypothesisEvidenceIds: hypothesis.map((u) => u.id),
+      vocabularyOnlyEvidenceIds,
       excludedRedundantIds: redundancy.redundant.map((u) => u.id),
     });
   }
@@ -357,6 +384,7 @@ export function evaluate(input: EvaluationInput): Evaluation {
     results,
     redundancy,
     relationships: deriveRelationships(redundancy.kept, links),
+    vennCells: vennCells(redundancy.kept, evidenceBasisLinks),
     provenanceViolations,
   };
 }

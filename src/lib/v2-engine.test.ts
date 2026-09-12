@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  REFERENCE_POLICY,
   TERRITORIES,
   TERRITORY_IDS,
   crossMapPairs,
@@ -289,5 +290,71 @@ describe("stability", () => {
     const { results } = evaluate(base);
     const probes = nextProbes(results);
     expect(probes.every((p) => results.find((r) => r.territory === p.territory)!.status !== "Earned")).toBe(true);
+  });
+});
+
+describe("V2 correction — vocabulary similarity is never resolution", () => {
+  const ev = (id: string, responseId: string): EvidenceStatement => ({
+    id,
+    runId: SEED_RUN_ID,
+    responseId,
+    statement: `${id} statement`,
+    kind: "behavioral",
+    strength: 1,
+    origin: "response",
+  });
+
+  it("vocabulary-similarity links contribute no resolution and cannot earn", () => {
+    const e = evaluate({
+      runId: SEED_RUN_ID,
+      evidence: [ev("v1", "RA"), ev("v2", "RB")],
+      links: [
+        { id: "lv1", evidenceId: "v1", territory: 3, basis: "vocabulary_similarity", rationale: "wording" },
+        { id: "lv2", evidenceId: "v2", territory: 3, basis: "vocabulary_similarity", rationale: "wording" },
+      ],
+    });
+    const t3 = e.results.find((r) => r.territory === 3)!;
+    expect(t3.resolution).toBe(0);
+    expect(t3.independence).toBe(0);
+    expect(t3.supportingEvidenceIds).toEqual([]);
+    expect(t3.status).not.toBe("Earned");
+    expect(t3.vocabularyOnlyEvidenceIds).toEqual(["v1", "v2"]);
+  });
+
+  it("an explicit evidence-basis link does resolve, alongside vocabulary links", () => {
+    const e = evaluate({
+      runId: SEED_RUN_ID,
+      evidence: [ev("v1", "RA"), ev("v2", "RB")],
+      links: [
+        { id: "lv1", evidenceId: "v1", territory: 3, basis: "evidence", rationale: "evidence" },
+        { id: "lv2", evidenceId: "v2", territory: 3, basis: "vocabulary_similarity", rationale: "wording" },
+      ],
+    });
+    const t3 = e.results.find((r) => r.territory === 3)!;
+    expect(t3.supportingEvidenceIds).toEqual(["v1"]);
+    expect(t3.vocabularyOnlyEvidenceIds).toEqual(["v2"]);
+  });
+
+  it("venn cells are built from evidence-basis links only", () => {
+    const e = evaluate({
+      runId: SEED_RUN_ID,
+      evidence: [ev("v1", "RA")],
+      links: [
+        { id: "lv1", evidenceId: "v1", territory: 2, basis: "evidence", rationale: "evidence" },
+        { id: "lv2", evidenceId: "v1", territory: 5, basis: "vocabulary_similarity", rationale: "wording" },
+      ],
+    });
+    expect(e.vennCells).toEqual([{ territories: [2], evidenceIds: ["v1"] }]);
+  });
+});
+
+describe("V2 reference associations", () => {
+  it("are comparative-only workbook data, present on every territory", () => {
+    expect(REFERENCE_POLICY).toContain("COMPARATIVE ONLY");
+    for (const t of TERRITORIES) expect(Array.isArray(t.references)).toBe(true);
+    expect(TERRITORIES.find((t) => t.n === 4)!.references).toEqual(["Tetractys"]);
+    expect(TERRITORIES.find((t) => t.n === 6)!.references).toEqual(["Beauty", "perfect number"]);
+    expect(TERRITORIES.find((t) => t.n === 8)!.references).toEqual(["cube", "2^3"]);
+    expect(TERRITORIES.find((t) => t.n === 9)!.references).toEqual(["foundation"]);
   });
 });

@@ -2,10 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   AUTHORITY_STATUS,
+  REFERENCE_POLICY,
   TERRITORIES,
   crossMapPairs,
   type TerritoryId,
 } from "@/lib/v2-authority";
+import { V2Compass } from "@/components/v2-compass";
 import {
   DEPENDENCIES,
   EVIDENCE_KIND_WEIGHT,
@@ -17,7 +19,6 @@ import {
   nextProbes,
   normalizeStatement,
   orderInvariant,
-  vennCells,
   type EvidenceKind,
   type EvidenceStatement,
   type LinkBasis,
@@ -62,7 +63,7 @@ const AXIOMS = [
   "One evidence item may be located in several territories. Overlap is information.",
   "Repeated wording inside one response is one evidence unit; across responses it is corroboration.",
   "CrossMap status is authority: DIRECT, CANDIDATE, LINGUISTIC_PROXIMITY, NO_CURRENT_OVERLAP.",
-  "Linguistic proximity is never proof of intersection.",
+  "Linguistic proximity is never proof of intersection: vocabulary-similarity links are reference information and are excluded from resolution and Earned status.",
   "An intersection is earned only when evidence supports both meanings.",
   "Contradiction, Unknown and Undetermined are all valid outcomes. 'I don't know' is never Number 1.",
   "Every result traces to evidence ids. A result may never feed back as evidence.",
@@ -101,12 +102,9 @@ function Lab() {
   );
   const evaluation = useMemo(() => evaluate(input), [input]);
   const { results, redundancy, relationships, provenanceViolations } = evaluation;
+  const cells = evaluation.vennCells;
   const probes = useMemo(() => nextProbes(results), [results]);
   const invariant = useMemo(() => orderInvariant(input), [input]);
-  const cells = useMemo(
-    () => vennCells(redundancy.kept, links),
-    [redundancy.kept, links],
-  );
   const activeRelationships = relationships.filter(
     (r) => r.status !== "NO_CURRENT_OVERLAP",
   );
@@ -196,7 +194,7 @@ qualification == 1 (research dependency graph, UNVERIFIED)`}
 
       <Section
         title="Expanded 1–9 territories"
-        note="Locked V2 vocabulary and distinctions"
+        note="Locked V2 vocabulary, distinctions and comparative references"
       >
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {TERRITORIES.map((t) => (
@@ -210,9 +208,16 @@ qualification == 1 (research dependency graph, UNVERIFIED)`}
               <p className="mt-2 border-t border-border/50 pt-2 font-mono text-[11px] text-hypothesis">
                 distinction: {t.distinction}
               </p>
+              <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                reference (comparative only):{" "}
+                {t.references.length > 0 ? t.references.join(" · ") : "not supplied — UNVERIFIED"}
+              </p>
             </div>
           ))}
         </div>
+        <p className="mt-4 font-mono text-xs text-muted-foreground">
+          Reference associations: {REFERENCE_POLICY}
+        </p>
       </Section>
 
       <Section title="Evidence taxonomy" note="Kind determines admissibility and weight">
@@ -491,20 +496,21 @@ qualification == 1 (research dependency graph, UNVERIFIED)`}
       </Section>
 
       <Section
-        title="Venn / bubble / compass cells"
-        note="Derived from evidence links — never a scoring authority"
+        title="Venn / bubble / compass"
+        note="Derived view of the cell + relationship data model — never a scoring authority"
       >
-        <ul className="grid gap-2 font-mono text-xs sm:grid-cols-2 lg:grid-cols-3">
-          {cells.length === 0 && <li className="text-undetermined">no located evidence</li>}
-          {cells.map((c) => (
-            <li key={c.territories.join("-")} className="rounded border border-border p-3">
-              <span className="text-primary">{c.territories.join(" ∩ ")}</span>
-              <span className="ml-2 text-muted-foreground">
-                {c.evidenceIds.join(", ")}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {cells.length === 0 ? (
+          <p className="font-mono text-xs text-undetermined">no located evidence</p>
+        ) : (
+          <V2Compass cells={cells} relationships={relationships} />
+        )}
+        <p className="mt-4 border-t border-border/50 pt-3 font-mono text-xs text-muted-foreground">
+          Boundary: the source representation is the cell / relationship data
+          model in the engine. This diagram is a derived view of it — geometry,
+          radius and visual adjacency carry no structural meaning, are not
+          evidence, and never feed back into evaluation. Cells are built from
+          evidence-basis links only.
+        </p>
       </Section>
 
       <Section
@@ -537,6 +543,12 @@ qualification == 1 (research dependency graph, UNVERIFIED)`}
                 {r.uncertaintyEvidenceIds.length > 0 &&
                   ` · unknown: ${r.uncertaintyEvidenceIds.join(", ")}`}
               </p>
+              {r.vocabularyOnlyEvidenceIds.length > 0 && (
+                <p className="mt-1 font-mono text-[11px] text-hypothesis">
+                  vocabulary-similarity only (not counted):{" "}
+                  {r.vocabularyOnlyEvidenceIds.join(", ")}
+                </p>
+              )}
               {r.hypothesisOnly && (
                 <p className="mt-2 font-mono text-xs text-hypothesis">
                   hypothesis only — no response-derived evidence
