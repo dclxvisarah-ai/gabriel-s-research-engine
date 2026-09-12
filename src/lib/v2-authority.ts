@@ -55,6 +55,7 @@ export const TERRITORIES: readonly Territory[] = [
     name: "Beginning",
     vocabulary: ["unity", "source", "origin", "emergence"],
     distinction: "emergence vs later differentiation/recurrence",
+    references: [],
   },
   {
     n: 2,
@@ -67,6 +68,7 @@ export const TERRITORIES: readonly Territory[] = [
       "two meaningful elements",
     ],
     distinction: "meaningful duality vs mere pair; duality vs pattern",
+    references: [],
   },
   {
     n: 3,
@@ -74,6 +76,7 @@ export const TERRITORIES: readonly Territory[] = [
     vocabulary: ["relationship", "harmony", "mediation", "reconciliation"],
     distinction:
       "recognizable relationship/configuration vs mere recurrence",
+    references: [],
   },
   {
     n: 4,
@@ -87,6 +90,7 @@ export const TERRITORIES: readonly Territory[] = [
       "Tetractys",
     ],
     distinction: "pattern vs organized/stable structure",
+    references: ["Tetractys"],
   },
   {
     n: 5,
@@ -102,6 +106,7 @@ export const TERRITORIES: readonly Territory[] = [
       "differentiation",
     ],
     distinction: "meaningful discrimination vs mere conflict/pairing",
+    references: [],
   },
   {
     n: 6,
@@ -115,18 +120,21 @@ export const TERRITORIES: readonly Territory[] = [
       "perfect number",
     ],
     distinction: "separate elements functioning coherently together",
+    references: ["Beauty", "perfect number"],
   },
   {
     n: 7,
     name: "Staying",
     vocabulary: ["persistence", "endurance"],
     distinction: "persistence vs repetition/compulsion/continuing",
+    references: [],
   },
   {
     n: 8,
     name: "Listening",
     vocabulary: ["receptive processing", "listening", "cube", "2^3"],
     distinction: "receiving/processing vs passivity/indecision",
+    references: ["cube", "2^3"],
   },
   {
     n: 9,
@@ -134,6 +142,7 @@ export const TERRITORIES: readonly Territory[] = [
     vocabulary: ["completion", "foundation", "integration"],
     distinction:
       "completion/carry-forward within Gabriel's 1–9 psychological space",
+    references: ["foundation"],
   },
 ] as const;
 
