@@ -28,12 +28,11 @@ export type TerritoryId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 /**
  * Reference associations are COMPARATIVE ONLY — they are never an identity
  * claim, never empirical proof, and never a scoring authority. They are
- * transcribed from the verified workbook terms and are not extended here.
- * A territory with an empty `references` list means the workbook supplied no
- * comparative association for it: that absence is UNVERIFIED, not "none".
+ * transcribed exactly from the verified workbook's separate Reference column
+ * and are not extended here.
  */
 export const REFERENCE_POLICY =
-  "COMPARATIVE ONLY — not identity, not proof, not scoring authority; empty list means not supplied (UNVERIFIED), not absent";
+  "COMPARATIVE ONLY — not identity, not proof, not scoring authority; transcribed exactly from workbook Reference column";
 
 export interface Territory {
   n: TerritoryId;
@@ -55,7 +54,7 @@ export const TERRITORIES: readonly Territory[] = [
     name: "Beginning",
     vocabulary: ["unity", "source", "origin", "emergence"],
     distinction: "emergence vs later differentiation/recurrence",
-    references: [],
+    references: ["Monad/One; Keter (comparative only)"],
   },
   {
     n: 2,
@@ -68,7 +67,7 @@ export const TERRITORIES: readonly Territory[] = [
       "two meaningful elements",
     ],
     distinction: "meaningful duality vs mere pair; duality vs pattern",
-    references: [],
+    references: ["Dyad; Chokhmah (comparative only)"],
   },
   {
     n: 3,
@@ -76,7 +75,7 @@ export const TERRITORIES: readonly Territory[] = [
     vocabulary: ["relationship", "harmony", "mediation", "reconciliation"],
     distinction:
       "recognizable relationship/configuration vs mere recurrence",
-    references: [],
+    references: ["Triad; Binah (comparative only)"],
   },
   {
     n: 4,
@@ -90,7 +89,7 @@ export const TERRITORIES: readonly Territory[] = [
       "Tetractys",
     ],
     distinction: "pattern vs organized/stable structure",
-    references: ["Tetractys"],
+    references: ["Tetrad; Hesed/Chesed (comparative only)"],
   },
   {
     n: 5,
@@ -106,7 +105,7 @@ export const TERRITORIES: readonly Territory[] = [
       "differentiation",
     ],
     distinction: "meaningful discrimination vs mere conflict/pairing",
-    references: [],
+    references: ["Pentad; Gevurah (comparative only)"],
   },
   {
     n: 6,
@@ -120,21 +119,21 @@ export const TERRITORIES: readonly Territory[] = [
       "perfect number",
     ],
     distinction: "separate elements functioning coherently together",
-    references: ["Beauty", "perfect number"],
+    references: ["Hexad; Tiferet (comparative only)"],
   },
   {
     n: 7,
     name: "Staying",
     vocabulary: ["persistence", "endurance"],
     distinction: "persistence vs repetition/compulsion/continuing",
-    references: [],
+    references: ["Heptad; Netzach (comparative only)"],
   },
   {
     n: 8,
     name: "Listening",
     vocabulary: ["receptive processing", "listening", "cube", "2^3"],
     distinction: "receiving/processing vs passivity/indecision",
-    references: ["cube", "2^3"],
+    references: ["Octad; Hod (comparative only)"],
   },
   {
     n: 9,
@@ -142,7 +141,7 @@ export const TERRITORIES: readonly Territory[] = [
     vocabulary: ["completion", "foundation", "integration"],
     distinction:
       "completion/carry-forward within Gabriel's 1–9 psychological space",
-    references: ["foundation"],
+    references: ["Ennead; Yesod/Malkhut comparison, not identity"],
   },
 ] as const;
 

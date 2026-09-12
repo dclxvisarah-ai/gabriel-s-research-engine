@@ -351,10 +351,39 @@ describe("V2 correction — vocabulary similarity is never resolution", () => {
 describe("V2 reference associations", () => {
   it("are comparative-only workbook data, present on every territory", () => {
     expect(REFERENCE_POLICY).toContain("COMPARATIVE ONLY");
-    for (const t of TERRITORIES) expect(Array.isArray(t.references)).toBe(true);
-    expect(TERRITORIES.find((t) => t.n === 4)!.references).toEqual(["Tetractys"]);
-    expect(TERRITORIES.find((t) => t.n === 6)!.references).toEqual(["Beauty", "perfect number"]);
-    expect(TERRITORIES.find((t) => t.n === 8)!.references).toEqual(["cube", "2^3"]);
-    expect(TERRITORIES.find((t) => t.n === 9)!.references).toEqual(["foundation"]);
+    for (const t of TERRITORIES) {
+      expect(Array.isArray(t.references)).toBe(true);
+      expect(t.references.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("match the exact workbook Reference column for all nine territories", () => {
+    expect(TERRITORIES.find((t) => t.n === 1)!.references).toEqual([
+      "Monad/One; Keter (comparative only)",
+    ]);
+    expect(TERRITORIES.find((t) => t.n === 2)!.references).toEqual([
+      "Dyad; Chokhmah (comparative only)",
+    ]);
+    expect(TERRITORIES.find((t) => t.n === 3)!.references).toEqual([
+      "Triad; Binah (comparative only)",
+    ]);
+    expect(TERRITORIES.find((t) => t.n === 4)!.references).toEqual([
+      "Tetrad; Hesed/Chesed (comparative only)",
+    ]);
+    expect(TERRITORIES.find((t) => t.n === 5)!.references).toEqual([
+      "Pentad; Gevurah (comparative only)",
+    ]);
+    expect(TERRITORIES.find((t) => t.n === 6)!.references).toEqual([
+      "Hexad; Tiferet (comparative only)",
+    ]);
+    expect(TERRITORIES.find((t) => t.n === 7)!.references).toEqual([
+      "Heptad; Netzach (comparative only)",
+    ]);
+    expect(TERRITORIES.find((t) => t.n === 8)!.references).toEqual([
+      "Octad; Hod (comparative only)",
+    ]);
+    expect(TERRITORIES.find((t) => t.n === 9)!.references).toEqual([
+      "Ennead; Yesod/Malkhut comparison, not identity",
+    ]);
   });
 });
