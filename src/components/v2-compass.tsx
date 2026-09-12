@@ -134,7 +134,7 @@ export function V2Compass({
         })}
         <text
           x={CX}
-          y={CY}
+          y={SIZE - 6}
           textAnchor="middle"
           className="font-mono"
           fontSize={10}
