@@ -235,6 +235,11 @@ export interface TerritoryResult {
   contradictingEvidenceIds: string[];
   uncertaintyEvidenceIds: string[];
   hypothesisEvidenceIds: string[];
+  /**
+   * Evidence linked here on a vocabulary-similarity basis only. Reported as
+   * research/reference information; excluded from resolution and Earned status.
+   */
+  vocabularyOnlyEvidenceIds: string[];
   excludedRedundantIds: string[];
 }
 
@@ -248,6 +253,8 @@ export interface Evaluation {
   results: TerritoryResult[];
   redundancy: RedundancyReport;
   relationships: RelationshipRecord[];
+  /** Venn / bubble / compass source cells — derived, never scoring authority. */
+  vennCells: VennCell[];
   provenanceViolations: ProvenanceViolation[];
 }
 
@@ -335,6 +342,7 @@ export function evaluate(input: EvaluationInput): Evaluation {
       contradictingEvidenceIds: contradicting.map((u) => u.id),
       uncertaintyEvidenceIds: uncertainty.map((u) => u.id),
       hypothesisEvidenceIds: hypothesis.map((u) => u.id),
+      vocabularyOnlyEvidenceIds,
       excludedRedundantIds: redundancy.redundant.map((u) => u.id),
     });
   }
@@ -376,6 +384,7 @@ export function evaluate(input: EvaluationInput): Evaluation {
     results,
     redundancy,
     relationships: deriveRelationships(redundancy.kept, links),
+    vennCells: vennCells(redundancy.kept, evidenceBasisLinks),
     provenanceViolations,
   };
 }
