@@ -28,12 +28,11 @@ export type TerritoryId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 /**
  * Reference associations are COMPARATIVE ONLY — they are never an identity
  * claim, never empirical proof, and never a scoring authority. They are
- * transcribed from the verified workbook terms and are not extended here.
- * A territory with an empty `references` list means the workbook supplied no
- * comparative association for it: that absence is UNVERIFIED, not "none".
+ * transcribed exactly from the verified workbook's separate Reference column
+ * and are not extended here.
  */
 export const REFERENCE_POLICY =
-  "COMPARATIVE ONLY — not identity, not proof, not scoring authority; empty list means not supplied (UNVERIFIED), not absent";
+  "COMPARATIVE ONLY — not identity, not proof, not scoring authority; transcribed exactly from workbook Reference column";
 
 export interface Territory {
   n: TerritoryId;
