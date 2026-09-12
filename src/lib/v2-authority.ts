@@ -25,6 +25,16 @@ export const AUTHORITY_STATUS = {
 
 export type TerritoryId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
+/**
+ * Reference associations are COMPARATIVE ONLY — they are never an identity
+ * claim, never empirical proof, and never a scoring authority. They are
+ * transcribed from the verified workbook terms and are not extended here.
+ * A territory with an empty `references` list means the workbook supplied no
+ * comparative association for it: that absence is UNVERIFIED, not "none".
+ */
+export const REFERENCE_POLICY =
+  "COMPARATIVE ONLY — not identity, not proof, not scoring authority; empty list means not supplied (UNVERIFIED), not absent";
+
 export interface Territory {
   n: TerritoryId;
   /** Locked V2 short name. */
@@ -33,7 +43,10 @@ export interface Territory {
   vocabulary: string[];
   /** Locked V2 semantic distinction (what this territory is NOT). */
   distinction: string;
+  /** Comparative reference associations from the verified workbook. */
+  references: string[];
 }
+
 
 /** LOCKED V2 — expanded 1–9 semantic architecture. Do not extend or invent. */
 export const TERRITORIES: readonly Territory[] = [
